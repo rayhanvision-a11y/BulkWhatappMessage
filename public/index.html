@@ -2277,6 +2277,12 @@
                 </button>
             </div>
 
+            <!-- Live Status / Result Alert Box -->
+            <div id="gh-sync-result-box" style="display:none;padding:12px 14px;border-radius:12px;font-size:12px;font-weight:600;align-items:center;gap:8px;">
+                <span id="gh-sync-result-icon" style="font-size:16px;"></span>
+                <span id="gh-sync-result-text" style="flex:1;line-height:1.4;"></span>
+            </div>
+
             <!-- Config Form -->
             <form id="github-sync-config-form" onsubmit="saveGitHubSyncSettings(event)" style="display:flex;flex-direction:column;gap:12px;background:rgba(0,0,0,0.03);padding:14px;border-radius:12px;border:1px solid rgba(0,0,0,0.08);">
                 <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -2293,8 +2299,11 @@
                         <input type="text" id="gh-input-branch" value="main" placeholder="main" class="wa-modal-input" style="height:36px;font-size:12px;">
                     </div>
                     <div>
-                        <label class="wa-modal-label" style="font-size:11px;">Personal Access Token (PAT)</label>
-                        <input type="password" id="gh-input-token" placeholder="ghp_xxxxxxxx (Required for upload)" class="wa-modal-input" style="height:36px;font-size:12px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;">
+                            <label class="wa-modal-label" style="font-size:11px;">Personal Access Token (PAT) *</label>
+                            <a href="https://github.com/settings/tokens/new?description=WhatsApp%20System&scopes=repo" target="_blank" style="font-size:10.5px;color:#00a884;text-decoration:underline;font-weight:700;">🔑 Create Token</a>
+                        </div>
+                        <input type="password" id="gh-input-token" placeholder="Paste ghp_... token here" class="wa-modal-input" style="height:36px;font-size:12px;">
                     </div>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:space-between;padding-top:4px;">

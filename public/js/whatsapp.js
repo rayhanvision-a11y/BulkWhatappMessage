@@ -2799,6 +2799,29 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e) {}
     }
 
+    function showGitHubResult(icon, text, type) {
+        const box = document.getElementById('gh-sync-result-box');
+        const iconEl = document.getElementById('gh-sync-result-icon');
+        const textEl = document.getElementById('gh-sync-result-text');
+        if (!box || !iconEl || !textEl) return;
+        box.style.display = 'flex';
+        iconEl.textContent = icon;
+        textEl.textContent = text;
+        if (type === 'success') {
+            box.style.background = 'rgba(16, 185, 129, 0.12)';
+            box.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+            box.style.color = '#059669';
+        } else if (type === 'error') {
+            box.style.background = 'rgba(239, 68, 68, 0.12)';
+            box.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+            box.style.color = '#dc2626';
+        } else {
+            box.style.background = 'rgba(99, 102, 241, 0.12)';
+            box.style.border = '1px solid rgba(99, 102, 241, 0.3)';
+            box.style.color = '#4f46e5';
+        }
+    }
+
     async function saveGitHubSyncSettings(e) {
         if (e) e.preventDefault();
         const repo = document.getElementById('gh-input-repo')?.value.trim();
@@ -2815,19 +2838,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             if (data.success) {
                 showToast('GitHub configuration saved!', 'success');
+                showGitHubResult('✅', 'GitHub configuration and token saved successfully!', 'success');
                 await loadGitHubSyncSettings();
             } else {
                 showToast(data.message || 'Failed to save config', 'error');
+                showGitHubResult('❌', data.message || 'Failed to save configuration', 'error');
             }
         } catch(err) {
             showToast('Error saving GitHub settings: ' + err.message, 'error');
+            showGitHubResult('❌', 'Error saving settings: ' + err.message, 'error');
         }
     }
 
     async function executeGitHubPull(silent = false) {
         const btn = document.getElementById('btn-github-pull');
         if (btn) btn.disabled = true;
-        if (!silent) showToast('Syncing Global templates & lists from GitHub...', 'info');
+        if (!silent) {
+            showToast('Syncing Global templates & lists from GitHub...', 'info');
+            showGitHubResult('⏳', 'Downloading latest Global data from GitHub...', 'info');
+        }
 
         try {
             const res = await fetch(`${API_BASE}/github-sync/pull`, { method: 'POST' });
@@ -2842,12 +2871,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderQuickSelectLists();
                     renderSavedLists();
                 }
-                if (!silent) showToast(data.message || 'Synced successfully from GitHub!', 'success');
+                if (!silent) {
+                    showToast(data.message || 'Synced successfully from GitHub!', 'success');
+                    showGitHubResult('✅', data.message || 'Synced successfully from GitHub!', 'success');
+                }
             } else {
-                if (!silent) showToast(data.message || 'GitHub sync failed.', 'error');
+                if (!silent) {
+                    showToast(data.message || 'GitHub sync failed.', 'error');
+                    showGitHubResult('❌', data.message || 'GitHub sync failed.', 'error');
+                }
             }
         } catch(err) {
-            if (!silent) showToast('Sync error: ' + err.message, 'error');
+            if (!silent) {
+                showToast('Sync error: ' + err.message, 'error');
+                showGitHubResult('❌', 'Sync error: ' + err.message, 'error');
+            }
         } finally {
             if (btn) btn.disabled = false;
         }
@@ -2857,17 +2895,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('btn-github-push');
         if (btn) btn.disabled = true;
         showToast('Uploading Global data to GitHub...', 'info');
+        showGitHubResult('⏳', 'Uploading Global templates & lists to GitHub...', 'info');
 
         try {
             const res = await fetch(`${API_BASE}/github-sync/push`, { method: 'POST' });
             const data = await res.json();
             if (data.success) {
                 showToast(data.message || 'Uploaded to GitHub successfully!', 'success');
+                showGitHubResult('✅', data.message || 'Uploaded to GitHub successfully!', 'success');
             } else {
                 showToast(data.message || 'GitHub upload failed.', 'error');
+                showGitHubResult('❌', data.message || 'GitHub upload failed.', 'error');
             }
         } catch(err) {
             showToast('Upload error: ' + err.message, 'error');
+            showGitHubResult('❌', 'Upload error: ' + err.message, 'error');
         } finally {
             if (btn) btn.disabled = false;
         }
