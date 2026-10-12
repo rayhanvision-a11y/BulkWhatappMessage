@@ -2016,11 +2016,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div style="font-size:10.5px;color:${subColor};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(preview)}</div>
                 </div>
                 <div style="display:flex;gap:4px;flex-shrink:0;" class="tmpl-actions">
-                    ${canEdit ? `<button class="tmpl-edit-btn" data-id="${tmpl.id}" data-scope="${tmpl.scope}" title="Edit"
+                    ${canEdit ? `<button type="button" class="tmpl-edit-btn" data-id="${tmpl.id}" data-scope="${tmpl.scope}" title="Edit"
                         style="width:26px;height:26px;border-radius:7px;background:${btnBg};border:1px solid ${btnBorder};color:${isDark ? '#00a884' : '#4f46e5'};cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;">
                         <svg style="width:11px;height:11px;pointer-events:none;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>` : ''}
-                    ${canDelete ? `<button class="tmpl-del-btn" data-id="${tmpl.id}" data-scope="${tmpl.scope}" title="Delete"
+                    ${canDelete ? `<button type="button" class="tmpl-del-btn" data-id="${tmpl.id}" data-scope="${tmpl.scope}" title="Delete"
                         style="width:26px;height:26px;border-radius:7px;background:${btnBg};border:1px solid ${btnBorder};color:#ef4444;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;">
                         <svg style="width:11px;height:11px;pointer-events:none;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     </button>` : ''}
@@ -2519,12 +2519,42 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Bulk Send / Schedule
+    // ── Bulk Send / Schedule (Strict User-Initiated Execution Only) ──────
+    // 1. Completely disable implicit form submission (e.g. Enter key or clicking any button in form)
     if (formBulkMsg) {
-        formBulkMsg.addEventListener('submit', async (e) => {
+        formBulkMsg.addEventListener('submit', (e) => {
             e.preventDefault();
+            e.stopPropagation();
+            return false;
+        });
+        formBulkMsg.addEventListener('keydown', (e) => {
+            // Prevent Enter key in inputs from ever submitting the form
+            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        });
+    }
+
+    // 2. Broadcast will ONLY execute when user explicitly clicks "Start Bulk Broadcast" button
+    const btnStartBulk = document.getElementById('btn-start-bulk');
+    if (btnStartBulk) {
+        btnStartBulk.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (isSending) {
+                showToast('Broadcast already in progress. Please wait...', 'warning');
+                return;
+            }
+
             if (bulkSelectedGroups.size === 0) {
-                alert('Please select target recipients.');
+                await waAlert({
+                    title: 'No Recipients Selected',
+                    desc: 'Please select at least 1 contact or group from the left panel before starting a broadcast.',
+                    icon: '👥'
+                });
                 return;
             }
 
@@ -2532,13 +2562,36 @@ document.addEventListener('DOMContentLoaded', () => {
             const isScheduled = broadcastModeScheduled?.checked;
             const broadcastName = document.getElementById('broadcast-name')?.value.trim() || ('Broadcast ' + new Date().toLocaleString());
 
+            if (!text && !attachedBulkImageBase64) {
+                await waAlert({
+                    title: 'Empty Message',
+                    desc: 'Please write message content or attach an image before broadcasting.',
+                    icon: '✍️'
+                });
+                return;
+            }
+
             if (isScheduled) {
-                // Schedule broadcast
                 const scheduledAtInput = document.getElementById('schedule-datetime');
                 const scheduledAt = scheduledAtInput?.value;
-                if (!scheduledAt) { alert('Please pick a date and time.'); return; }
-                if (new Date(scheduledAt).getTime() <= Date.now()) { alert('Scheduled time must be in the future.'); return; }
-                if (!text && !attachedBulkImageBase64) { alert('Please write a message or attach an image.'); return; }
+                if (!scheduledAt) {
+                    await waAlert({ title: 'Pick Date & Time', desc: 'Please select a date and time for the scheduled broadcast.', icon: '📅' });
+                    return;
+                }
+                if (new Date(scheduledAt).getTime() <= Date.now()) {
+                    await waAlert({ title: 'Invalid Schedule Time', desc: 'Scheduled time must be in the future.', icon: '⏱️' });
+                    return;
+                }
+
+                // Explicit Confirmation Gate for Scheduled Broadcast
+                const confirmSched = await waConfirm({
+                    title: '📅 Schedule Broadcast?',
+                    desc: `Schedule this message for ${bulkSelectedGroups.size} recipient(s) on ${new Date(scheduledAt).toLocaleString()}?`,
+                    icon: '📅',
+                    confirmText: 'Yes, Schedule',
+                    cancelText: 'Cancel'
+                });
+                if (!confirmSched) return;
 
                 try {
                     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -2555,19 +2608,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     const data = await res.json();
                     if (data.success) {
-                        alert(`✅ Broadcast scheduled for ${new Date(scheduledAt).toLocaleString()}\nWill be sent to ${bulkSelectedGroups.size} recipients.`);
+                        showToast(`Broadcast scheduled for ${new Date(scheduledAt).toLocaleString()}`, 'success');
                         fetchScheduledBroadcasts();
                     } else {
-                        alert('Failed to schedule: ' + (data.message || 'Unknown error'));
+                        await waAlert({ title: 'Schedule Failed', desc: data.message || 'Unknown error', icon: '❌' });
                     }
                 } catch(err) {
-                    alert('Error: ' + err.message);
+                    showToast('Error: ' + err.message, 'error');
                 }
                 return;
             }
 
-            // Immediate broadcast via server-side endpoint
-            if (!text && !attachedBulkImageBase64) { alert('Please write a message or attach an image.'); return; }
+            // ── MANDATORY CONFIRMATION GATE FOR IMMEDIATE BROADCAST ──
+            // Never send any message until user explicitly confirms this modal!
+            const delaySec = document.getElementById('bulk-delay-interval')?.value || '5';
+            const confirmed = await waConfirm({
+                title: '🚀 Start Bulk Broadcast?',
+                desc: `Are you sure you want to send this broadcast now to <b>${bulkSelectedGroups.size}</b> recipient(s)?<br><br>⏱️ Safe Delay: <b>${delaySec}s</b> per contact.`,
+                icon: '📢',
+                confirmText: 'Yes, Start Sending',
+                cancelText: 'Cancel'
+            });
+
+            if (!confirmed) {
+                // User cancelled or closed modal: STRICTLY DO NOTHING
+                return;
+            }
 
             isSending = true;
             btnStartBulk.disabled = true;
@@ -2586,7 +2652,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         name: broadcastName,
                         jids: Array.from(bulkSelectedGroups),
                         message: text,
-                        imageBase64: attachedBulkImageBase64
+                        imageBase64: attachedBulkImageBase64,
+                        delaySeconds: parseInt(delaySec, 10)
                     })
                 });
                 const data = await res.json();
@@ -2594,17 +2661,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.success) {
                     if (bulkProgressText) bulkProgressText.textContent = `Done! ✅ ${data.sentCount} sent, ❌ ${data.failCount} failed`;
                     if (bulkConsoleLog) bulkConsoleLog.innerHTML += `[${new Date().toLocaleTimeString()}] 🎉 Finished! Sent: ${data.sentCount}, Failed: ${data.failCount}\n`;
+                    showToast(`Broadcast completed: ${data.sentCount} sent`, 'success');
                     fetchBroadcastHistory();
                 } else {
                     if (bulkProgressText) bulkProgressText.textContent = 'Failed: ' + (data.message || 'Unknown error');
+                    showToast(data.message || 'Broadcast failed', 'error');
                 }
             } catch(err) {
                 if (bulkProgressText) bulkProgressText.textContent = 'Network error: ' + err.message;
+                showToast('Network error: ' + err.message, 'error');
+            } finally {
+                btnStartBulk.disabled = false;
+                btnStartBulk.textContent = '🚀 Start Bulk Broadcast';
+                isSending = false;
             }
-
-            btnStartBulk.disabled = false;
-            btnStartBulk.textContent = '🚀 Start Bulk Broadcast';
-            isSending = false;
         });
     }
 
