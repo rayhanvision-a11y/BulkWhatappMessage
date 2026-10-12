@@ -1,1 +1,31 @@
-[]
+[
+  {
+    "id": "list-1791024511778",
+    "name": "Rayhan",
+    "jids": [
+      "8801785931628@s.whatsapp.net",
+      "8801989128526@s.whatsapp.net",
+      "8801716509528@s.whatsapp.net",
+      "8801733441978@s.whatsapp.net",
+      "8801610555228@s.whatsapp.net",
+      "8801313354555@s.whatsapp.net",
+      "8801713862534@s.whatsapp.net"
+    ],
+    "targetCount": 7,
+    "createdAt": "10/3/2026",
+    "isPublic": true,
+    "isGlobal": true
+  },
+  {
+    "id": "list-1791025443533",
+    "name": "R",
+    "jids": [
+      "8801785931628@s.whatsapp.net",
+      "8801989128526@s.whatsapp.net"
+    ],
+    "targetCount": 2,
+    "createdAt": "10/3/2026",
+    "isPublic": true,
+    "isGlobal": true
+  }
+]
