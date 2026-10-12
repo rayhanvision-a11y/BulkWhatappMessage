@@ -1,0 +1,17 @@
+{
+  "name": "whatsapp-system",
+  "version": "1.0.0",
+  "description": "Standalone WhatsApp Web Management System with Baileys",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "pino": "^9.14.0",
+    "qrcode": "^1.5.4"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "username": "admin",
+      "email": "admin@visiontech.com.bd",
+      "password": "password",
+      "name": "System Administrator",
+      "role": "admin"
+    },
+    {
+      "id": "1789820970339",
+      "username": "rayhanvision@gmail.com",
+      "email": "rayhanvision@gmail.com",
+      "password": "admin",
+      "name": "Rayhan Rabby",
+      "role": "user"
+    },
+    {
+      "id": "1791020049757",
+      "username": "admin1@visiontech.com.bd",
+      "email": "admin1@visiontech.com.bd",
+      "password": "Admin",
+      "name": "Demo",
+      "role": "admin"
+    },
+    {
+      "id": "1791700786743",
+      "username": "admin11@visiontech.com.bd",
+      "email": "admin11@visiontech.com.bd",
+      "password": "admin1",
+      "name": "admin1",
+      "role": "admin"
+    }
+  ]
+}

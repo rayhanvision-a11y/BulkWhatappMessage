@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Portable Binaries
+bin/node.exe
+
+# WhatsApp Session Auth & Private Stores (SENSITIVE - NEVER COMMIT)
+auth_info_*/
+baileys_store_*.json
+
+# Logs & Temporary Files
+*.log
+test.log
+server.log
+scratch/
+scratch_tail.txt
+
+# Archive Packages
+*.zip
+
+# Local credentials
+github_config.json
+cookies.txt
+cookie.txt
