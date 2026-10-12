@@ -44,8 +44,9 @@ If Not serverReady Then
         nodeExe = "node"
     End If
     
-    ' Launch Node server completely hidden (window style 0)
-    WshShell.Run "cmd /c """"" & nodeExe & """ server.js > """ & strPath & "\server.log"" 2>&1""", 0, False
+    Dim runCmd
+    runCmd = "cmd /c """"" & nodeExe & """ server.js > """ & strPath & "\server.log"" 2>&1"""
+    WshShell.Run runCmd, 0, False
     
     ' Wait silently for server to become active (no console flicker)
     Dim attempts
