@@ -2562,7 +2562,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 2. Broadcast will ONLY execute when user explicitly clicks "Start Bulk Broadcast" button
-    const btnStartBulk = document.getElementById('btn-start-bulk');
     if (btnStartBulk) {
         btnStartBulk.addEventListener('click', async (e) => {
             e.preventDefault();
