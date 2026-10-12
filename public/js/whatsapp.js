@@ -1425,21 +1425,17 @@ document.addEventListener('DOMContentLoaded', () => {
         bulkGroupList.innerHTML = '';
         const isDark = isDarkMode();
 
-        // Collect existing JIDs in allChats
-        const existingJids = new Set((allChats || []).map(c => c.id));
-        const extraChats = [];
+        // Collect valid JIDs belonging to current logged-in user
+        const myJidSet = new Set((allChats || []).map(c => c.id));
 
-        // Build fallback chat objects for any selected JIDs missing in allChats
-        bulkSelectedGroups.forEach(jid => {
-            if (!existingJids.has(jid)) {
-                const cleanName = jid.replace('@s.whatsapp.net', '').replace('@g.us', '');
-                const isGroup = jid.endsWith('@g.us');
-                extraChats.push({ id: jid, name: cleanName, isGroup: isGroup });
-                existingJids.add(jid);
+        // Strict isolation: Never retain or message JIDs that do not exist in current user's account
+        for (const jid of Array.from(bulkSelectedGroups)) {
+            if (!myJidSet.has(jid)) {
+                bulkSelectedGroups.delete(jid);
             }
-        });
+        }
 
-        let targets = [...(allChats || []), ...extraChats];
+        let targets = [...(allChats || [])];
 
         if (bulkActiveFilter === 'groups') targets = targets.filter(c => c.isGroup);
         else if (bulkActiveFilter === 'personal') targets = targets.filter(c => !c.isGroup);
@@ -1592,12 +1588,18 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const myJidSet = new Set((allChats || []).map(c => c.id));
+
         combinedLists.forEach(list => {
             const colors = list.isGlobal 
                 ? ['#00a884', '#059669', '#10b981'] 
                 : ['#1d4ed8','#7c3aed','#b45309','#0f766e','#be185d'];
             const color = colors[(list.name||'').charCodeAt(0) % colors.length];
-            const isActive = list.jids.every(jid => bulkSelectedGroups.has(jid));
+
+            // Strict filtering: Only consider JIDs that actually exist in the current logged-in user's account
+            const myMatchingJids = (list.jids || []).filter(jid => myJidSet.has(jid));
+            const hasMatches = myMatchingJids.length > 0;
+            const isActive = hasMatches && myMatchingJids.every(jid => bulkSelectedGroups.has(jid));
 
             const btnBg = isActive ? color + (isDark ? '22' : '15') : (isDark ? '#111b21' : '#ffffff');
             const btnBorder = isActive ? color : (list.isGlobal ? (isDark ? '#00a88466' : '#a7f3d0') : (isDark ? '#2a3942' : '#e2e8f0'));
@@ -1605,18 +1607,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.style.cssText = `display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;border:2px solid ${btnBorder};background:${btnBg};cursor:pointer;transition:all 0.2s;`;
+            btn.style.cssText = `display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;border:2px solid ${btnBorder};background:${btnBg};cursor:pointer;transition:all 0.2s;opacity:${hasMatches ? '1' : '0.6'};`;
             btn.innerHTML = `
                 ${list.isGlobal ? '<span style="font-size:11px;" title="Global List (Shared with Team)">🌐</span>' : `<span style="width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0;"></span>`}
                 <span style="font-size:11px;font-weight:700;color:${textColor};">${escapeHtml(list.name)}</span>
-                <span style="font-size:9.5px;color:${isActive ? color : (isDark?'#8696a0':'#64748b')};font-weight:600;">${list.targetCount}</span>
+                <span style="font-size:9.5px;color:${isActive ? color : (isDark?'#8696a0':'#64748b')};font-weight:600;" title="${hasMatches ? `${myMatchingJids.length} contacts found in your account (out of ${list.jids.length})` : 'No matching contacts in your account'}">${myMatchingJids.length}</span>
                 ${isActive ? '<svg style="width:11px;height:11px;" fill="none" stroke="#4f46e5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>' : ''}
             `;
 
             btn.addEventListener('click', () => {
-                const alreadyAll = list.jids.every(jid => bulkSelectedGroups.has(jid));
-                if (alreadyAll) list.jids.forEach(jid => bulkSelectedGroups.delete(jid));
-                else list.jids.forEach(jid => bulkSelectedGroups.add(jid));
+                if (!hasMatches) {
+                    showToast(`None of the contacts/groups in "${list.name}" exist in your WhatsApp account.`, 'info');
+                    return;
+                }
+                const alreadyAll = myMatchingJids.every(jid => bulkSelectedGroups.has(jid));
+                if (alreadyAll) {
+                    myMatchingJids.forEach(jid => bulkSelectedGroups.delete(jid));
+                } else {
+                    myMatchingJids.forEach(jid => bulkSelectedGroups.add(jid));
+                    if (myMatchingJids.length < (list.jids || []).length) {
+                        showToast(`Selected ${myMatchingJids.length} of ${list.jids.length} contacts found in your account for "${list.name}". (${list.jids.length - myMatchingJids.length} not in your account)`, 'info');
+                    }
+                }
                 if (bulkSelectedCount) bulkSelectedCount.textContent = bulkSelectedGroups.size + ' Selected';
                 renderBulkGroupList(document.getElementById('bulk-recipient-search')?.value || '');
                 renderQuickSelectLists();
@@ -1640,6 +1652,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         container.innerHTML = '';
+        const myJidSet = new Set((allChats || []).map(c => c.id));
 
         const createListItemEl = (list, isGlobal) => {
             const item = document.createElement('div');
@@ -1652,6 +1665,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const color = colors[(list.name||'').charCodeAt(0) % colors.length];
             const initials = (list.name||'L').substring(0,2).toUpperCase();
 
+            const myMatchingJids = (list.jids || []).filter(jid => myJidSet.has(jid));
+
             item.innerHTML = `
                 <div style="width:30px;height:30px;border-radius:8px;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:white;flex-shrink:0;">${initials}</div>
                 <div style="flex:1;min-width:0;">
@@ -1659,7 +1674,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span style="font-size:12px;font-weight:700;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(list.name)}</span>
                         ${isGlobal ? '<span style="font-size:8.5px;color:#00a884;background:rgba(0,168,132,0.15);border:1px solid rgba(0,168,132,0.3);padding:1px 5px;border-radius:6px;font-weight:700;">🌐 Global</span>' : '<span style="font-size:8.5px;color:#8696a0;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:6px;font-weight:600;">🔒 Private</span>'}
                     </div>
-                    <div style="font-size:10px;color:#8696a0;">${list.targetCount || (list.jids ? list.jids.length : 0)} contacts</div>
+                    <div style="font-size:10px;color:#8696a0;">${myMatchingJids.length} of ${(list.jids ? list.jids.length : 0)} contacts in your account</div>
                 </div>
                 <div class="bl-actions" style="display:flex;gap:3px;flex-shrink:0;">
                     <button type="button" class="bl-public-btn" title="${isGlobal ? 'Click to make Private (Local only)' : 'Click to make Global (Shared with team & GitHub)'}" style="width:26px;height:26px;border-radius:6px;background:${isGlobal ? 'rgba(0,168,132,0.15)' : '#1a2a32'};border:1px solid ${isGlobal ? '#00a884' : '#2a3942'};color:${isGlobal ? '#00a884' : '#8696a0'};cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;">
@@ -1680,11 +1695,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.querySelectorAll('.bl-item').forEach(el => el.classList.remove('active'));
                 item.classList.add('active');
                 bulkSelectedGroups.clear();
-                list.jids.forEach(jid => bulkSelectedGroups.add(jid));
+
+                // Select only the JIDs that exist in the current user's account
+                myMatchingJids.forEach(jid => bulkSelectedGroups.add(jid));
+
                 if (bulkSelectedCount) bulkSelectedCount.textContent = bulkSelectedGroups.size + ' Selected';
                 switchToTab('bulk');
                 renderBulkGroupList(document.getElementById('bulk-recipient-search')?.value || '');
                 renderQuickSelectLists();
+
+                if (myMatchingJids.length === 0) {
+                    showToast(`No matching contacts or groups in your account for "${list.name}".`, 'info');
+                } else if (myMatchingJids.length < (list.jids ? list.jids.length : 0)) {
+                    showToast(`Selected ${myMatchingJids.length} of ${list.jids.length} contacts found in your WhatsApp account for "${list.name}".`, 'info');
+                }
             });
 
             // Rename
@@ -2620,11 +2644,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // ── MANDATORY CONFIRMATION GATE FOR IMMEDIATE BROADCAST ──
-            // Never send any message until user explicitly confirms this modal!
+            // Only send to recipients that genuinely exist in the logged-in user's account
+            const myJidSet = new Set((allChats || []).map(c => c.id));
+            const validRecipients = Array.from(bulkSelectedGroups).filter(jid => myJidSet.has(jid));
+
+            if (validRecipients.length === 0) {
+                await waAlert({
+                    title: 'No Matching Recipients',
+                    desc: 'None of the selected contacts or groups exist in your current WhatsApp account.',
+                    icon: '⚠️'
+                });
+                return;
+            }
+
             const delaySec = document.getElementById('bulk-delay-interval')?.value || '5';
             const confirmed = await waConfirm({
                 title: '🚀 Start Bulk Broadcast?',
-                desc: `Are you sure you want to send this broadcast now to <b>${bulkSelectedGroups.size}</b> recipient(s)?<br><br>⏱️ Safe Delay: <b>${delaySec}s</b> per contact.`,
+                desc: `Are you sure you want to send this broadcast now to <b>${validRecipients.length}</b> recipient(s)?<br><br>⏱️ Safe Delay: <b>${delaySec}s</b> per contact.`,
                 icon: '📢',
                 confirmText: 'Yes, Start Sending',
                 cancelText: 'Cancel'
@@ -2640,8 +2676,8 @@ document.addEventListener('DOMContentLoaded', () => {
             btnStartBulk.textContent = '⏳ Sending...';
             if (bulkProgressSection) bulkProgressSection.style.display = 'block';
             if (bulkProgressBarInner) bulkProgressBarInner.style.width = '10%';
-            if (bulkProgressText) bulkProgressText.textContent = `Sending to ${bulkSelectedGroups.size} recipients via server...`;
-            if (bulkConsoleLog) bulkConsoleLog.innerHTML = `[${new Date().toLocaleTimeString()}] Starting broadcast "${broadcastName}" → ${bulkSelectedGroups.size} recipients...\n`;
+            if (bulkProgressText) bulkProgressText.textContent = `Sending to ${validRecipients.length} recipients via server...`;
+            if (bulkConsoleLog) bulkConsoleLog.innerHTML = `[${new Date().toLocaleTimeString()}] Starting broadcast "${broadcastName}" → ${validRecipients.length} recipients...\n`;
 
             try {
                 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -2650,7 +2686,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
                     body: JSON.stringify({
                         name: broadcastName,
-                        jids: Array.from(bulkSelectedGroups),
+                        jids: validRecipients,
                         message: text,
                         imageBase64: attachedBulkImageBase64,
                         delaySeconds: parseInt(delaySec, 10)
