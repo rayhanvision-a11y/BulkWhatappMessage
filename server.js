@@ -1535,13 +1535,33 @@ app.post('/api/whatsapp/templates', (req, res) => {
 
 app.post('/api/whatsapp/templates/:id/rename', (req, res) => {
     const s = getSessionFromReq(req);
-    let tmpl = globalTemplatesStore.find(t => t.id === req.params.id);
-    const isGlobal = !!tmpl;
-    if (!tmpl) tmpl = s.savedTemplatesStore.find(t => t.id === req.params.id);
-    if (!tmpl) return res.status(404).json({ success: false });
+    const targetId = req.params.id;
+    let inGlobalIdx = globalTemplatesStore.findIndex(t => t.id === targetId);
+    let inPersonalIdx = s.savedTemplatesStore.findIndex(t => t.id === targetId);
+
+    let tmpl = inGlobalIdx !== -1 ? globalTemplatesStore[inGlobalIdx] : (inPersonalIdx !== -1 ? s.savedTemplatesStore[inPersonalIdx] : null);
+    if (!tmpl) return res.status(404).json({ success: false, message: 'Template not found' });
+
     if (req.body.name) tmpl.name = req.body.name.trim();
-    if (req.body.message !== undefined) tmpl.message = req.body.message;
-    if (isGlobal) saveGlobalTemplates(); else saveStoreToDisk(s);
+    if (req.body.message !== undefined) tmpl.message = req.body.message.trim();
+
+    const targetScope = req.body.scope;
+    if (targetScope === 'global' && inPersonalIdx !== -1) {
+        // Move from personal to global
+        s.savedTemplatesStore.splice(inPersonalIdx, 1);
+        globalTemplatesStore.unshift(tmpl);
+        saveGlobalTemplates();
+        saveStoreToDisk(s, true);
+    } else if (targetScope === 'personal' && inGlobalIdx !== -1) {
+        // Move from global to personal
+        globalTemplatesStore.splice(inGlobalIdx, 1);
+        s.savedTemplatesStore.unshift(tmpl);
+        saveGlobalTemplates();
+        saveStoreToDisk(s, true);
+    } else {
+        if (inGlobalIdx !== -1) saveGlobalTemplates();
+        else saveStoreToDisk(s, true);
+    }
     res.json({ success: true, globalTemplates: globalTemplatesStore, personalTemplates: s.savedTemplatesStore });
 });
 

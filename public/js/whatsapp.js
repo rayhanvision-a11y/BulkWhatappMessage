@@ -1662,20 +1662,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div style="font-size:10px;color:#8696a0;">${list.targetCount || (list.jids ? list.jids.length : 0)} contacts</div>
                 </div>
                 <div class="bl-actions" style="display:flex;gap:3px;flex-shrink:0;">
-                    <button class="bl-public-btn" title="${isGlobal ? 'Click to make Private (Local only)' : 'Click to make Global (Shared with team & GitHub)'}" style="width:26px;height:26px;border-radius:6px;background:${isGlobal ? 'rgba(0,168,132,0.15)' : '#1a2a32'};border:1px solid ${isGlobal ? '#00a884' : '#2a3942'};color:${isGlobal ? '#00a884' : '#8696a0'};cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;">
+                    <button type="button" class="bl-public-btn" title="${isGlobal ? 'Click to make Private (Local only)' : 'Click to make Global (Shared with team & GitHub)'}" style="width:26px;height:26px;border-radius:6px;background:${isGlobal ? 'rgba(0,168,132,0.15)' : '#1a2a32'};border:1px solid ${isGlobal ? '#00a884' : '#2a3942'};color:${isGlobal ? '#00a884' : '#8696a0'};cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;">
                         ${isGlobal ? '🌐' : '🔒'}
                     </button>
-                    <button class="bl-edit-btn" title="Rename" style="width:26px;height:26px;border-radius:6px;background:#1a2a32;border:1px solid #2a3942;color:#8696a0;cursor:pointer;display:flex;align-items:center;justify-content:center;">
-                        <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    <button type="button" class="bl-edit-btn" title="Rename" style="width:26px;height:26px;border-radius:6px;background:#1a2a32;border:1px solid #2a3942;color:#8696a0;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+                        <svg style="width:12px;height:12px;pointer-events:none;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
-                    <button class="bl-del-btn" title="Delete" style="width:26px;height:26px;border-radius:6px;background:#1a2a32;border:1px solid #2a3942;color:#ef4444;cursor:pointer;display:flex;align-items:center;justify-content:center;">
-                        <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    <button type="button" class="bl-del-btn" title="Delete" style="width:26px;height:26px;border-radius:6px;background:#1a2a32;border:1px solid #2a3942;color:#ef4444;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+                        <svg style="width:12px;height:12px;pointer-events:none;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     </button>
                 </div>
             `;
 
             item.addEventListener('click', (e) => {
-                if (e.target.closest('.bl-actions')) return;
+                if (e.target.closest('.bl-actions') || e.target.closest('button')) return;
                 activeBroadcastListId = list.id;
                 document.querySelectorAll('.bl-item').forEach(el => el.classList.remove('active'));
                 item.classList.add('active');
@@ -1689,6 +1689,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Rename
             item.querySelector('.bl-edit-btn')?.addEventListener('click', async (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 const newName = await waPrompt({
                     title: 'Rename Preset List',
@@ -1712,6 +1713,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         renderSavedLists();
                         renderQuickSelectLists();
                         showToast(`Renamed to "${newName.trim()}"`, 'success');
+                    } else {
+                        showToast(data.message || 'Failed to rename list.', 'error');
                     }
                 } catch(err) {
                     showToast('Failed to rename: ' + err.message, 'error');
@@ -1720,6 +1723,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Toggle Global / Private (Make Public/Private)
             item.querySelector('.bl-public-btn')?.addEventListener('click', async (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 try {
                     const res = await fetch(`${API_BASE}/saved-lists/${list.id}/toggle-public`, {
@@ -1742,6 +1746,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Delete
             item.querySelector('.bl-del-btn')?.addEventListener('click', async (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 const ok = await waConfirm({
                     title: 'Delete Preset List?',
@@ -1789,60 +1794,134 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function saveCurrentSelectionAsPreset() {
+    // ── Save Quick Select Preset Modal Logic ─────────────────────────
+    const modalSavePreset = document.getElementById('modal-save-preset');
+    const inputSavePresetName = document.getElementById('input-save-preset-name');
+    const btnConfirmSavePreset = document.getElementById('btn-confirm-save-preset');
+    const btnCancelSavePreset = document.getElementById('btn-cancel-save-preset');
+    const btnCloseSavePreset = document.getElementById('btn-close-save-preset');
+
+    function openSavePresetModal() {
         const selectedJids = Array.from(bulkSelectedGroups);
         if (selectedJids.length === 0) { 
             showToast('Please select at least 1 contact or group to save.', 'warning'); 
             return; 
         }
-        const name = await waPrompt({
-            title: 'Save Quick Select Preset',
-            desc: `Save ${selectedJids.length} selected recipients as a quick-access preset list.`,
-            label: 'Preset List Name:',
-            placeholder: 'e.g. VIP Clients, Pabna Zone, Monthly Bills',
-            icon: '⚡',
-            confirmText: 'Next'
-        });
-        if (!name || !name.trim()) return;
-
-        const isGlobal = await waConfirm({
-            title: 'Preset Visibility',
-            desc: `Where do you want to save "${name.trim()}"?\n\n• 🌐 GLOBAL: Visible to whole team on all PCs & syncable to GitHub\n• 🔒 PRIVATE: Saved only on this computer`,
-            icon: '🌐',
-            confirmText: '🌐 Make Global (Team)',
-            cancelText: '🔒 Keep Private'
-        });
-        const scope = isGlobal ? 'global' : 'personal';
-
-        try {
-            const res = await fetch(`${API_BASE}/saved-lists`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: name.trim(), jids: selectedJids, scope })
-            });
-            const data = await res.json();
-            if (data.success) { 
-                savedLists = Array.isArray(data.lists) ? data.lists : []; 
-                globalLists = Array.isArray(data.globalLists) ? data.globalLists : [];
-                renderSavedLists(); 
-                renderQuickSelectLists();
-                showToast(`List "${name.trim()}" saved as ${scope === 'global' ? '🌐 Global' : '🔒 Private'}!`, 'success'); 
-            } else {
-                showToast(data.message || 'Failed to save preset list.', 'error');
-            }
-        } catch(err) { 
-            showToast('Failed to save: ' + err.message, 'error'); 
+        if (!modalSavePreset) return;
+        const countBadge = document.getElementById('save-preset-count-badge');
+        if (countBadge) countBadge.textContent = selectedJids.length;
+        if (inputSavePresetName) {
+            inputSavePresetName.value = '';
+            setTimeout(() => inputSavePresetName.focus(), 60);
         }
+        const globRadio = document.querySelector('input[name="preset-scope-radio"][value="global"]');
+        if (globRadio) globRadio.checked = true;
+        updatePresetScopeStyles('global');
+        modalSavePreset.style.display = 'flex';
+    }
+
+    function closeSavePresetModal() {
+        if (modalSavePreset) modalSavePreset.style.display = 'none';
+    }
+
+    function updatePresetScopeStyles(val) {
+        const lblG = document.getElementById('opt-preset-scope-global');
+        const lblP = document.getElementById('opt-preset-scope-personal');
+        if (lblG && lblP) {
+            if (val === 'global') {
+                lblG.style.borderColor = '#00a884';
+                lblG.style.background = 'rgba(0,168,132,0.12)';
+                lblP.style.borderColor = '#64748b';
+                lblP.style.background = 'rgba(100,116,139,0.06)';
+            } else {
+                lblP.style.borderColor = '#6366f1';
+                lblP.style.background = 'rgba(99,102,241,0.12)';
+                lblG.style.borderColor = '#64748b';
+                lblG.style.background = 'rgba(100,116,139,0.06)';
+            }
+        }
+    }
+
+    document.querySelectorAll('input[name="preset-scope-radio"]').forEach(r => {
+        r.addEventListener('change', (e) => updatePresetScopeStyles(e.target.value));
+    });
+
+    if (btnCancelSavePreset) btnCancelSavePreset.addEventListener('click', closeSavePresetModal);
+    if (btnCloseSavePreset) btnCloseSavePreset.addEventListener('click', closeSavePresetModal);
+    if (modalSavePreset) {
+        modalSavePreset.addEventListener('click', (e) => {
+            if (e.target === modalSavePreset) closeSavePresetModal();
+        });
+    }
+
+    if (inputSavePresetName) {
+        inputSavePresetName.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                btnConfirmSavePreset?.click();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeSavePresetModal();
+            }
+        });
+    }
+
+    if (btnConfirmSavePreset) {
+        btnConfirmSavePreset.addEventListener('click', async () => {
+            const selectedJids = Array.from(bulkSelectedGroups);
+            if (selectedJids.length === 0) {
+                showToast('Please select at least 1 contact or group to save.', 'warning');
+                closeSavePresetModal();
+                return;
+            }
+            const name = inputSavePresetName ? inputSavePresetName.value.trim() : '';
+            if (!name) {
+                showToast('Please enter a preset list name.', 'warning');
+                inputSavePresetName?.focus();
+                return;
+            }
+            const scope = document.querySelector('input[name="preset-scope-radio"]:checked')?.value || 'global';
+
+            btnConfirmSavePreset.disabled = true;
+            btnConfirmSavePreset.textContent = '⌛ Saving...';
+            try {
+                const res = await fetch(`${API_BASE}/saved-lists`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, jids: selectedJids, scope })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    savedLists = Array.isArray(data.lists) ? data.lists : [];
+                    globalLists = Array.isArray(data.globalLists) ? data.globalLists : [];
+                    renderSavedLists();
+                    renderQuickSelectLists();
+                    closeSavePresetModal();
+                    showToast(`Preset "${name}" saved (${scope === 'global' ? '🌐 Global' : '🔒 Private'})!`, 'success');
+                } else {
+                    showToast(data.message || 'Failed to save preset list.', 'error');
+                }
+            } catch(err) {
+                showToast('Failed to save: ' + err.message, 'error');
+            } finally {
+                btnConfirmSavePreset.disabled = false;
+                btnConfirmSavePreset.textContent = '💾 Save List';
+            }
+        });
+    }
+
+    function saveCurrentSelectionAsPreset() {
+        openSavePresetModal();
     }
 
     const btnAddBroadcastList = document.getElementById('btn-add-broadcast-list');
     if (btnAddBroadcastList) {
         btnAddBroadcastList.addEventListener('click', () => {
             if (bulkSelectedGroups.size > 0) {
-                saveCurrentSelectionAsPreset();
+                openSavePresetModal();
             } else {
                 switchToTab('bulk');
-                showToast('Select recipients from the list below, then click "+ New List" or "💾 Save"', 'info');
+                showToast('Select recipients below, then click "+ New List" or "💾 Save"', 'info');
             }
         });
     }
@@ -1851,7 +1930,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnSaveCurrentList) {
         btnSaveCurrentList.addEventListener('click', (e) => {
             e.preventDefault();
-            saveCurrentSelectionAsPreset();
+            openSavePresetModal();
         });
     }
 
@@ -1859,7 +1938,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnQuickSelectNew) {
         btnQuickSelectNew.addEventListener('click', (e) => {
             e.preventDefault();
-            saveCurrentSelectionAsPreset();
+            openSavePresetModal();
         });
     }
 
@@ -1949,10 +2028,25 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
 
             // Click card body → apply to textarea
-            card.addEventListener('click', (e) => {
+            card.addEventListener('click', async (e) => {
                 if (e.target.closest('.tmpl-actions')) return;
                 const textarea = document.getElementById('bulk-message-content');
-                if (textarea) { textarea.value = tmpl.message; textarea.dispatchEvent(new Event('input')); textarea.focus(); }
+                if (textarea) {
+                    const currentMsg = textarea.value.trim();
+                    if (currentMsg && currentMsg !== tmpl.message.trim()) {
+                        const replaceOk = await waConfirm({
+                            title: 'Replace Message Content?',
+                            desc: `This will replace your current message content with template "${tmpl.name}". Continue?`,
+                            icon: '⚠️',
+                            confirmText: 'Yes, Replace',
+                            cancelText: 'Keep Current'
+                        });
+                        if (!replaceOk) return;
+                    }
+                    textarea.value = tmpl.message;
+                    textarea.dispatchEvent(new Event('input'));
+                    textarea.focus();
+                }
                 document.querySelectorAll('#templates-container [data-tmpl-id]').forEach(c => {
                     c.classList.remove('tmpl-active');
                     c.style.background = bgDefault; c.style.borderColor = borderDefault;
@@ -1976,12 +2070,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (delBtn) {
                 delBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    if (!confirm(`"${tmpl.name}" template delete করবেন?`)) return;
+                    const ok = await waConfirm({
+                        title: 'Delete Template?',
+                        desc: `Are you sure you want to delete template "${tmpl.name}"?`,
+                        icon: '🗑️',
+                        confirmText: 'Delete',
+                        isDanger: true
+                    });
+                    if (!ok) return;
                     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
                     await fetch(`${API_BASE}/templates?id=${tmpl.id}&scope=${tmpl.scope}`, {
                         method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken }
                     });
                     fetchTemplates();
+                    showToast(`Template "${tmpl.name}" deleted.`, 'success');
                 });
             }
 
@@ -1997,9 +2099,45 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('tmpl-edit-scope').value = tmpl.scope;
         document.getElementById('tmpl-edit-name').value = tmpl.name;
         document.getElementById('tmpl-edit-message').value = tmpl.message;
+
+        const isGlob = tmpl.scope === 'global';
+        const rGlob = document.querySelector('input[name="tmpl-edit-scope-choice"][value="global"]');
+        const rPers = document.querySelector('input[name="tmpl-edit-scope-choice"][value="personal"]');
+        if (rGlob && rPers) {
+            rGlob.checked = isGlob;
+            rPers.checked = !isGlob;
+            updateTmplEditScopeStyles(isGlob ? 'global' : 'personal');
+        }
+
         updateTmplEditPreview();
         modal.style.display = 'flex';
     }
+
+    function updateTmplEditScopeStyles(scope) {
+        const lblG = document.getElementById('tmpl-edit-scope-lbl-global');
+        const lblP = document.getElementById('tmpl-edit-scope-lbl-personal');
+        if (lblG && lblP) {
+            if (scope === 'global') {
+                lblG.style.borderColor = '#00a884';
+                lblG.style.background = 'rgba(0,168,132,0.12)';
+                lblG.style.color = '#00a884';
+                lblP.style.borderColor = '#64748b';
+                lblP.style.background = 'rgba(100,116,139,0.06)';
+                lblP.style.color = '#64748b';
+            } else {
+                lblP.style.borderColor = '#6366f1';
+                lblP.style.background = 'rgba(99,102,241,0.12)';
+                lblP.style.color = '#6366f1';
+                lblG.style.borderColor = '#64748b';
+                lblG.style.background = 'rgba(100,116,139,0.06)';
+                lblG.style.color = '#64748b';
+            }
+        }
+    }
+
+    document.querySelectorAll('input[name="tmpl-edit-scope-choice"]').forEach(r => {
+        r.addEventListener('change', (e) => updateTmplEditScopeStyles(e.target.value));
+    });
 
     function updateTmplEditPreview() {
         const msg = document.getElementById('tmpl-edit-message')?.value || '';
@@ -2037,10 +2175,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnSaveTmplEdit) {
         btnSaveTmplEdit.addEventListener('click', async () => {
             const id = document.getElementById('tmpl-edit-id').value;
-            const scope = document.getElementById('tmpl-edit-scope').value;
+            const chosenScope = document.querySelector('input[name="tmpl-edit-scope-choice"]:checked')?.value || document.getElementById('tmpl-edit-scope').value;
             const name = document.getElementById('tmpl-edit-name').value.trim();
             const message = document.getElementById('tmpl-edit-message').value.trim();
-            if (!name || !message) { alert('Name and message required.'); return; }
+            if (!name || !message) { showToast('Name and message required.', 'warning'); return; }
             btnSaveTmplEdit.disabled = true;
             btnSaveTmplEdit.textContent = '⌛ Saving...';
             try {
@@ -2048,7 +2186,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch(`${API_BASE}/templates/${id}/rename`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify({ name, message, scope })
+                    body: JSON.stringify({ name, message, scope: chosenScope })
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -2056,10 +2194,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     personalTemplates = data.personalTemplates || personalTemplates;
                     renderTemplates();
                     document.getElementById('tmpl-edit-modal').style.display = 'none';
+                    showToast(`Template updated (${chosenScope === 'global' ? '🌐 Global' : '🔒 Personal'})!`, 'success');
                 } else {
-                    alert('Failed to save.');
+                    showToast(data.message || 'Failed to save template changes.', 'error');
                 }
-            } catch(e) { alert('Error: ' + e.message); }
+            } catch(e) { showToast('Error: ' + e.message, 'error'); }
             finally {
                 btnSaveTmplEdit.disabled = false;
                 btnSaveTmplEdit.innerHTML = '<svg style="width:13px;height:13px;" fill="none" stroke="white" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Save Changes';
@@ -2086,59 +2225,131 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const btnSaveTemplate = document.getElementById('btn-save-template');
-    if (btnSaveTemplate) {
-        btnSaveTemplate.addEventListener('click', async (e) => {
-            e.preventDefault();
+    // ── Save Template Modal Logic ────────────────────────────────────
+    const modalSaveTemplate = document.getElementById('modal-save-template');
+    const inputSaveTemplateName = document.getElementById('input-save-template-name');
+    const btnConfirmSaveTemplate = document.getElementById('btn-confirm-save-template');
+    const btnCancelSaveTemplate = document.getElementById('btn-cancel-save-template');
+    const btnCloseSaveTemplate = document.getElementById('btn-close-save-template');
+
+    function openSaveTemplateModal() {
+        const textarea = document.getElementById('bulk-message-content');
+        const msg = textarea?.value?.trim();
+        if (!msg) { 
+            showToast('Write a message before saving as template.', 'warning'); 
+            return; 
+        }
+        if (!modalSaveTemplate) return;
+        if (inputSaveTemplateName) {
+            inputSaveTemplateName.value = '';
+            setTimeout(() => inputSaveTemplateName.focus(), 60);
+        }
+        const globRadio = document.querySelector('input[name="new-template-scope-radio"][value="global"]');
+        if (globRadio) globRadio.checked = true;
+        updateNewTemplateScopeStyles('global');
+        modalSaveTemplate.style.display = 'flex';
+    }
+
+    function closeSaveTemplateModal() {
+        if (modalSaveTemplate) modalSaveTemplate.style.display = 'none';
+    }
+
+    function updateNewTemplateScopeStyles(val) {
+        const lblG = document.getElementById('opt-template-scope-global');
+        const lblP = document.getElementById('opt-template-scope-personal');
+        if (lblG && lblP) {
+            if (val === 'global') {
+                lblG.style.borderColor = '#00a884';
+                lblG.style.background = 'rgba(0,168,132,0.12)';
+                lblP.style.borderColor = '#64748b';
+                lblP.style.background = 'rgba(100,116,139,0.06)';
+            } else {
+                lblP.style.borderColor = '#6366f1';
+                lblP.style.background = 'rgba(99,102,241,0.12)';
+                lblG.style.borderColor = '#64748b';
+                lblG.style.background = 'rgba(100,116,139,0.06)';
+            }
+        }
+    }
+
+    document.querySelectorAll('input[name="new-template-scope-radio"]').forEach(r => {
+        r.addEventListener('change', (e) => updateNewTemplateScopeStyles(e.target.value));
+    });
+
+    if (btnCancelSaveTemplate) btnCancelSaveTemplate.addEventListener('click', closeSaveTemplateModal);
+    if (btnCloseSaveTemplate) btnCloseSaveTemplate.addEventListener('click', closeSaveTemplateModal);
+    if (modalSaveTemplate) {
+        modalSaveTemplate.addEventListener('click', (e) => {
+            if (e.target === modalSaveTemplate) closeSaveTemplateModal();
+        });
+    }
+
+    if (inputSaveTemplateName) {
+        inputSaveTemplateName.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                btnConfirmSaveTemplate?.click();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeSaveTemplateModal();
+            }
+        });
+    }
+
+    if (btnConfirmSaveTemplate) {
+        btnConfirmSaveTemplate.addEventListener('click', async () => {
             const textarea = document.getElementById('bulk-message-content');
             const msg = textarea?.value?.trim();
-            if (!msg) { 
-                showToast('Write a message before saving as template.', 'warning'); 
-                return; 
+            if (!msg) {
+                showToast('Write a message before saving as template.', 'warning');
+                closeSaveTemplateModal();
+                return;
             }
-            const name = await waPrompt({
-                title: 'Save Message Template',
-                desc: 'Save your current message draft as a reusable template.',
-                label: 'Template Name:',
-                placeholder: 'e.g. Payment Reminder, Service Update',
-                icon: '📋',
-                confirmText: 'Save Template'
-            });
-            if (!name || !name.trim()) return;
-
-            let scope = 'personal';
-            if (isSuperAdmin) {
-                const makeGlobal = await waConfirm({
-                    title: 'Make Template Global?',
-                    desc: `Do you want to share "${name.trim()}" with all users as a Global Template?\n(Click Cancel for Personal template only).`,
-                    icon: '🌐',
-                    confirmText: 'Yes, Make Global',
-                    cancelText: 'Keep Personal'
-                });
-                if (makeGlobal) scope = 'global';
+            const name = inputSaveTemplateName ? inputSaveTemplateName.value.trim() : '';
+            if (!name) {
+                showToast('Please enter a template name.', 'warning');
+                inputSaveTemplateName?.focus();
+                return;
             }
+            const scope = document.querySelector('input[name="new-template-scope-radio"]:checked')?.value || 'global';
 
+            btnConfirmSaveTemplate.disabled = true;
+            btnConfirmSaveTemplate.textContent = '⌛ Saving...';
             try {
                 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
                 const res = await fetch(`${API_BASE}/templates`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify({ name: name.trim(), message: msg, scope })
+                    body: JSON.stringify({ name, message: msg, scope })
                 });
-                if (!res.ok) { 
-                    showToast('Server error while saving template.', 'error'); 
-                    return; 
+                if (!res.ok) {
+                    showToast('Server error while saving template.', 'error');
+                    return;
                 }
                 const data = await res.json();
                 if (data.success) {
                     globalTemplates = data.globalTemplates || [];
                     personalTemplates = data.personalTemplates || [];
                     renderTemplates();
-                    showToast(`Template "${name.trim()}" saved!`, 'success');
+                    closeSaveTemplateModal();
+                    showToast(`Template "${name}" saved (${scope === 'global' ? '🌐 Global' : '🔒 Personal'})!`, 'success');
+                } else {
+                    showToast(data.message || 'Failed to save template.', 'error');
                 }
-            } catch(err) { 
-                showToast('Failed to save template: ' + err.message, 'error'); 
+            } catch(err) {
+                showToast('Failed to save template: ' + err.message, 'error');
+            } finally {
+                btnConfirmSaveTemplate.disabled = false;
+                btnConfirmSaveTemplate.textContent = '💾 Save Template';
             }
+        });
+    }
+
+    const btnSaveTemplate = document.getElementById('btn-save-template');
+    if (btnSaveTemplate) {
+        btnSaveTemplate.addEventListener('click', (e) => {
+            e.preventDefault();
+            openSaveTemplateModal();
         });
     }
 
@@ -2846,6 +3057,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function saveGitHubPatOnly(e) {
+        if (e) e.preventDefault();
+        const tokenInput = document.getElementById('gh-input-token');
+        const token = tokenInput?.value.trim();
+        if (!token) {
+            showToast('Please enter a Personal Access Token (PAT)', 'warning');
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/github-sync/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('GitHub Personal Access Token saved!', 'success');
+                showGitHubResult('✅', 'Personal Access Token (PAT) saved successfully! You can now click <b>"⬆️ Upload / Push"</b>.', 'success');
+                if (tokenInput) tokenInput.value = '';
+                await loadGitHubSyncSettings();
+            } else {
+                showToast(data.message || 'Failed to save token', 'error');
+                showGitHubResult('❌', data.message || 'Failed to save token', 'error');
+            }
+        } catch(err) {
+            showToast('Error saving token: ' + err.message, 'error');
+            showGitHubResult('❌', 'Error saving token: ' + err.message, 'error');
+        }
+    }
+
     async function saveGitHubSyncSettings(e) {
         if (e) e.preventDefault();
         const repo = document.getElementById('gh-input-repo')?.value.trim();
@@ -2949,6 +3191,19 @@ document.addEventListener('DOMContentLoaded', () => {
     window.executeGitHubPull = executeGitHubPull;
     window.executeGitHubPush = executeGitHubPush;
     window.saveGitHubSyncSettings = saveGitHubSyncSettings;
+    window.saveGitHubPatOnly = saveGitHubPatOnly;
+
+    const btnTogglePat = document.getElementById('btn-toggle-pat-accordion');
+    if (btnTogglePat) {
+        btnTogglePat.addEventListener('click', () => {
+            const content = document.getElementById('pat-accordion-content');
+            const arrow = document.getElementById('pat-accordion-arrow');
+            if (!content) return;
+            const isCurrentlyOpen = content.style.display === 'flex';
+            content.style.display = isCurrentlyOpen ? 'none' : 'flex';
+            if (arrow) arrow.textContent = isCurrentlyOpen ? '▼' : '▲';
+        });
+    }
 
     // Check autoSync on initial load
     setTimeout(async () => {
