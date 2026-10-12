@@ -6,7 +6,6 @@ WshShell.CurrentDirectory = strPath
 ' 1. Check if dependencies are installed
 baileysPath = strPath & "\node_modules\@whiskeysockets\baileys"
 If Not fso.FolderExists(baileysPath) Then
-    ' Open visible terminal only if first-time package installation is needed
     installCmd = "cmd /c cd /d """ & strPath & """ && title WhatsApp System - First Time Setup && " & _
                  "echo ================================================================ && " & _
                  "echo [WhatsApp System] Missing dependencies detected. && " & _
@@ -18,40 +17,63 @@ If Not fso.FolderExists(baileysPath) Then
 End If
 
 ' 2. Check if node server is responding on port 3000 (100% silent, no blinking CMD windows)
-Function IsServerReady()
+Function CheckUrl(testUrl)
     On Error Resume Next
     Dim http
     Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
     If http Is Nothing Then Set http = CreateObject("MSXML2.ServerXMLHTTP")
     If http Is Nothing Then Set http = CreateObject("MSXML2.XMLHTTP")
-    http.setTimeouts 500, 500, 500, 500
-    http.open "GET", "http://localhost:3000/api/auth/me", False
+    http.setTimeouts 1500, 1500, 1500, 1500
+    http.open "GET", testUrl, False
     http.send
     If Err.Number = 0 Then
+        CheckUrl = True
+    Else
+        CheckUrl = False
+    End If
+    On Error GoTo 0
+End Function
+
+Function IsServerReady()
+    If CheckUrl("http://127.0.0.1:3000/api/auth/me") Then
+        IsServerReady = True
+    ElseIf CheckUrl("http://localhost:3000/api/auth/me") Then
         IsServerReady = True
     Else
         IsServerReady = False
     End If
-    On Error GoTo 0
+End Function
+
+Function FindNodeExe()
+    Dim candidateNodes, n
+    candidateNodes = Array(strPath & "\bin\node.exe", _
+                           "C:\Program Files\nodejs\node.exe", _
+                           "C:\Program Files (x86)\nodejs\node.exe", _
+                           WshShell.ExpandEnvironmentStrings("%LocalAppData%\Programs\nodejs\node.exe"), _
+                           "C:\laragon\bin\nodejs\node.exe", _
+                           "C:\laragon\bin\nodejs\current\node.exe")
+    For Each n In candidateNodes
+        If fso.FileExists(n) Then
+            FindNodeExe = n
+            Exit Function
+        End If
+    Next
+    FindNodeExe = "node"
 End Function
 
 serverReady = IsServerReady()
 
 ' 3. Start Node server in background if not already running
 If Not serverReady Then
-    nodeExe = strPath & "\bin\node.exe"
-    If Not fso.FileExists(nodeExe) Then
-        nodeExe = "node"
-    End If
-    
+    nodeExe = FindNodeExe()
     Dim runCmd
-    runCmd = "cmd /c """"" & nodeExe & """ server.js > """ & strPath & "\server.log"" 2>&1"""
+    runCmd = "cmd /c cd /d """ & strPath & """ && """ & nodeExe & """ server.js > """ & strPath & "\server.log"" 2>&1"
     WshShell.Run runCmd, 0, False
     
     ' Wait silently for server to become active (no console flicker)
     Dim attempts
     attempts = 0
-    Do While attempts < 30
+    Do While attempts < 40
         WScript.Sleep 500
         If IsServerReady() Then
             serverReady = True
