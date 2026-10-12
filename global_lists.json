@@ -1,14 +1,14 @@
 [
   {
-    "id": "list-1791025443533",
-    "name": "R",
+    "id": "list-1791799126740",
+    "name": "Personal",
     "jids": [
-      "8801785931628@s.whatsapp.net",
-      "8801989128526@s.whatsapp.net"
+      "8801714841175@s.whatsapp.net",
+      "8801738160530@s.whatsapp.net"
     ],
     "targetCount": 2,
-    "createdAt": "10/3/2026",
-    "isPublic": true,
-    "isGlobal": true
+    "createdAt": "10/12/2026",
+    "isGlobal": true,
+    "isPublic": true
   }
 ]
