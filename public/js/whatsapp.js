@@ -1631,32 +1631,39 @@ document.addEventListener('DOMContentLoaded', () => {
         const countBadge = document.getElementById('broadcast-lists-count');
         if (!container) return;
 
-        if (countBadge) countBadge.textContent = savedLists.length;
+        const totalCount = savedLists.length + globalLists.length;
+        if (countBadge) countBadge.textContent = totalCount;
 
-        if (savedLists.length === 0) {
-            container.innerHTML = '<p style="font-size:11px;color:#8696a0;text-align:center;padding:12px 0;margin:0;">No saved lists yet.<br><span style="font-size:10px;">Select contacts in Bulk panel and click 💾 Save</span></p>';
+        if (totalCount === 0) {
+            container.innerHTML = '<p style="font-size:11px;color:#8696a0;text-align:center;padding:12px 0;margin:0;">No preset lists yet.<br><span style="font-size:10px;">Select contacts in Bulk panel and click <b>+ New List</b> or <b>💾 Save</b></span></p>';
             return;
         }
 
         container.innerHTML = '';
-        savedLists.forEach(list => {
+
+        const createListItemEl = (list, isGlobal) => {
             const item = document.createElement('div');
             item.className = 'bl-item' + (activeBroadcastListId === list.id ? ' active' : '');
             item.dataset.listId = list.id;
 
-            const colors = ['#005c4b','#1d4ed8','#7c3aed','#b45309','#0f766e','#be185d'];
+            const colors = isGlobal 
+                ? ['#00a884', '#059669', '#10b981', '#0d9488'] 
+                : ['#1d4ed8','#7c3aed','#b45309','#0f766e','#be185d'];
             const color = colors[(list.name||'').charCodeAt(0) % colors.length];
             const initials = (list.name||'L').substring(0,2).toUpperCase();
 
             item.innerHTML = `
                 <div style="width:30px;height:30px;border-radius:8px;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:white;flex-shrink:0;">${initials}</div>
                 <div style="flex:1;min-width:0;">
-                    <div style="font-size:12px;font-weight:700;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(list.name)}${list.isPublic ? ' <span style="font-size:9px;color:#facc15;font-weight:600;">🌐 Public</span>' : ''}</div>
-                    <div style="font-size:10px;color:#8696a0;">${list.targetCount} contacts</div>
+                    <div style="display:flex;align-items:center;gap:4px;">
+                        <span style="font-size:12px;font-weight:700;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(list.name)}</span>
+                        ${isGlobal ? '<span style="font-size:8.5px;color:#00a884;background:rgba(0,168,132,0.15);border:1px solid rgba(0,168,132,0.3);padding:1px 5px;border-radius:6px;font-weight:700;">🌐 Global</span>' : '<span style="font-size:8.5px;color:#8696a0;background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:6px;font-weight:600;">🔒 Private</span>'}
+                    </div>
+                    <div style="font-size:10px;color:#8696a0;">${list.targetCount || (list.jids ? list.jids.length : 0)} contacts</div>
                 </div>
                 <div class="bl-actions" style="display:flex;gap:3px;flex-shrink:0;">
-                    <button class="bl-public-btn" title="${list.isPublic ? 'Make Private' : 'Make Public'}" style="width:26px;height:26px;border-radius:6px;background:${list.isPublic ? '#2a3010' : '#1a2a32'};border:1px solid ${list.isPublic ? '#facc15' : '#2a3942'};color:${list.isPublic ? '#facc15' : '#8696a0'};cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;">
-                        ${list.isPublic ? '🌐' : '🔒'}
+                    <button class="bl-public-btn" title="${isGlobal ? 'Click to make Private (Local only)' : 'Click to make Global (Shared with team & GitHub)'}" style="width:26px;height:26px;border-radius:6px;background:${isGlobal ? 'rgba(0,168,132,0.15)' : '#1a2a32'};border:1px solid ${isGlobal ? '#00a884' : '#2a3942'};color:${isGlobal ? '#00a884' : '#8696a0'};cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;">
+                        ${isGlobal ? '🌐' : '🔒'}
                     </button>
                     <button class="bl-edit-btn" title="Rename" style="width:26px;height:26px;border-radius:6px;background:#1a2a32;border:1px solid #2a3942;color:#8696a0;cursor:pointer;display:flex;align-items:center;justify-content:center;">
                         <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -1674,184 +1681,185 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.classList.add('active');
                 bulkSelectedGroups.clear();
                 list.jids.forEach(jid => bulkSelectedGroups.add(jid));
+                if (bulkSelectedCount) bulkSelectedCount.textContent = bulkSelectedGroups.size + ' Selected';
                 switchToTab('bulk');
                 renderBulkGroupList(document.getElementById('bulk-recipient-search')?.value || '');
                 renderQuickSelectLists();
-                fetchTemplates();
             });
 
-            const editBtn = item.querySelector('.bl-edit-btn');
-            if (editBtn) {
-                editBtn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const newName = await waPrompt({
-                        title: 'Rename Preset List',
-                        desc: `Enter a new name for "${list.name}"`,
-                        label: 'New List Name:',
-                        defaultValue: list.name,
-                        icon: '✏️',
-                        confirmText: 'Rename'
+            // Rename
+            item.querySelector('.bl-edit-btn')?.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const newName = await waPrompt({
+                    title: 'Rename Preset List',
+                    desc: `Enter a new name for "${list.name}"`,
+                    label: 'New List Name:',
+                    defaultValue: list.name,
+                    icon: '✏️',
+                    confirmText: 'Rename'
+                });
+                if (!newName || !newName.trim() || newName.trim() === list.name) return;
+                try {
+                    const res = await fetch(`${API_BASE}/saved-lists/${list.id}/rename`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newName.trim() })
                     });
-                    if (!newName || !newName.trim() || newName.trim() === list.name) return;
-                    try {
-                        const res = await fetch(`${API_BASE}/saved-lists/${list.id}/rename`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ name: newName.trim() })
-                        });
-                        const data = await res.json();
-                        if (data.success) { 
-                            savedLists = data.lists; 
-                            renderSavedLists(); 
-                            renderQuickSelectLists();
-                            showToast(`Renamed to "${newName.trim()}"`, 'success');
-                        }
-                    } catch(err) {
-                        showToast('Failed to rename list', 'error');
+                    const data = await res.json();
+                    if (data.success) {
+                        savedLists = Array.isArray(data.lists) ? data.lists : savedLists;
+                        globalLists = Array.isArray(data.globalLists) ? data.globalLists : globalLists;
+                        renderSavedLists();
+                        renderQuickSelectLists();
+                        showToast(`Renamed to "${newName.trim()}"`, 'success');
                     }
-                });
-            }
+                } catch(err) {
+                    showToast('Failed to rename: ' + err.message, 'error');
+                }
+            });
 
-            const publicBtn = item.querySelector('.bl-public-btn');
-            if (publicBtn) {
-                publicBtn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    try {
-                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-                        const res = await fetch(`${API_BASE}/saved-lists/${list.id}/toggle-public`, {
-                            method: 'POST',
-                            headers: { 'X-CSRF-TOKEN': csrfToken }
-                        });
-                        const data = await res.json();
-                        if (data.success) { 
-                            savedLists = data.lists; 
-                            renderSavedLists(); 
-                            renderQuickSelectLists();
-                            showToast('List visibility updated', 'info');
-                        }
-                    } catch(err) {}
-                });
-            }
-
-            const delBtn = item.querySelector('.bl-del-btn');
-            if (delBtn) {
-                delBtn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const ok = await waConfirm({
-                        title: 'Delete Preset List?',
-                        desc: `Are you sure you want to delete "${list.name}"? This action cannot be undone.`,
-                        icon: '🗑️',
-                        confirmText: 'Delete List',
-                        isDanger: true
+            // Toggle Global / Private (Make Public/Private)
+            item.querySelector('.bl-public-btn')?.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                try {
+                    const res = await fetch(`${API_BASE}/saved-lists/${list.id}/toggle-public`, {
+                        method: 'POST'
                     });
-                    if (!ok) return;
-                    try {
-                        await fetch(`${API_BASE}/saved-lists?id=${list.id}`, { method: 'DELETE' });
-                        if (activeBroadcastListId === list.id) activeBroadcastListId = null;
+                    const data = await res.json();
+                    if (data.success) {
+                        savedLists = Array.isArray(data.lists) ? data.lists : [];
+                        globalLists = Array.isArray(data.globalLists) ? data.globalLists : [];
+                        renderSavedLists();
+                        renderQuickSelectLists();
+                        showToast(data.message || 'List visibility updated!', 'success');
+                    } else {
+                        showToast(data.message || 'Failed to update visibility', 'error');
+                    }
+                } catch(err) {
+                    showToast('Error: ' + err.message, 'error');
+                }
+            });
+
+            // Delete
+            item.querySelector('.bl-del-btn')?.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const ok = await waConfirm({
+                    title: 'Delete Preset List?',
+                    desc: `Are you sure you want to delete "${list.name}"? This action cannot be undone.`,
+                    icon: '🗑️',
+                    confirmText: 'Delete List',
+                    isDanger: true
+                });
+                if (!ok) return;
+                try {
+                    const res = await fetch(`${API_BASE}/saved-lists?id=${list.id}&scope=${isGlobal ? 'global' : 'personal'}`, { method: 'DELETE' });
+                    const data = await res.json();
+                    if (activeBroadcastListId === list.id) activeBroadcastListId = null;
+                    if (data.success) {
+                        savedLists = Array.isArray(data.lists) ? data.lists : [];
+                        globalLists = Array.isArray(data.globalLists) ? data.globalLists : [];
+                    } else {
                         fetchSavedLists();
-                        showToast(`Deleted list "${list.name}"`, 'success');
-                    } catch(err) {
-                        showToast('Failed to delete list', 'error');
                     }
-                });
-            }
-
-            container.appendChild(item);
-        });
-
-        // Show public lists from other users (admin/NOC only)
-        if (publicLists && publicLists.length > 0) {
-            const separator = document.createElement('div');
-            separator.style.cssText = 'font-size:10px;font-weight:700;color:#facc15;text-transform:uppercase;letter-spacing:0.5px;padding:8px 4px 4px;border-top:1px solid #2a3942;margin-top:4px;';
-            separator.textContent = '🌐 Shared Public Lists';
-            container.appendChild(separator);
-
-            publicLists.forEach(list => {
-                const colors = ['#005c4b','#1d4ed8','#7c3aed','#b45309','#0f766e','#be185d'];
-                const color = colors[(list.name||'').charCodeAt(0) % colors.length];
-                const initials = (list.name||'L').substring(0,2).toUpperCase();
-                const pubItem = document.createElement('div');
-                pubItem.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;cursor:pointer;background:#0d1b14;border:1px solid #facc1533;margin-bottom:4px;';
-                pubItem.innerHTML = `
-                    <div style="width:30px;height:30px;border-radius:8px;background:${color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:white;flex-shrink:0;">${initials}</div>
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-size:12px;font-weight:700;color:#e9edef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(list.name)}</div>
-                        <div style="font-size:10px;color:#8696a0;">${list.targetCount} contacts · User #${list._ownerUserId}</div>
-                    </div>
-                `;
-                pubItem.addEventListener('click', () => {
-                    bulkSelectedGroups.clear();
-                    list.jids.forEach(jid => bulkSelectedGroups.add(jid));
-                    if (bulkSelectedCount) bulkSelectedCount.textContent = bulkSelectedGroups.size + ' Selected';
-                    switchToTab('bulk');
-                    renderBulkGroupList(document.getElementById('bulk-recipient-search')?.value || '');
+                    renderSavedLists();
                     renderQuickSelectLists();
-                });
-                container.appendChild(pubItem);
+                    showToast(`Deleted list "${list.name}"`, 'success');
+                } catch(err) {
+                    showToast('Failed to delete list', 'error');
+                }
             });
+
+            return item;
+        };
+
+        if (globalLists.length > 0) {
+            const sepG = document.createElement('div');
+            sepG.style.cssText = 'font-size:10px;font-weight:800;color:#00a884;text-transform:uppercase;letter-spacing:0.6px;padding:6px 4px 4px;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;';
+            sepG.innerHTML = '<span>🌐 Global (Team) Lists</span><span style="font-size:9px;background:rgba(0,168,132,0.15);padding:1px 6px;border-radius:10px;">' + globalLists.length + '</span>';
+            container.appendChild(sepG);
+            globalLists.forEach(l => container.appendChild(createListItemEl(l, true)));
+        }
+
+        if (savedLists.length > 0) {
+            const sepP = document.createElement('div');
+            sepP.style.cssText = 'font-size:10px;font-weight:800;color:#8696a0;text-transform:uppercase;letter-spacing:0.6px;padding:6px 4px 4px;margin-top:6px;margin-bottom:4px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;';
+            sepP.innerHTML = '<span>🔒 Private (This PC)</span><span style="font-size:9px;background:rgba(255,255,255,0.08);padding:1px 6px;border-radius:10px;">' + savedLists.length + '</span>';
+            container.appendChild(sepP);
+            savedLists.forEach(l => container.appendChild(createListItemEl(l, false)));
+        }
+    }
+
+    async function saveCurrentSelectionAsPreset() {
+        const selectedJids = Array.from(bulkSelectedGroups);
+        if (selectedJids.length === 0) { 
+            showToast('Please select at least 1 contact or group to save.', 'warning'); 
+            return; 
+        }
+        const name = await waPrompt({
+            title: 'Save Quick Select Preset',
+            desc: `Save ${selectedJids.length} selected recipients as a quick-access preset list.`,
+            label: 'Preset List Name:',
+            placeholder: 'e.g. VIP Clients, Pabna Zone, Monthly Bills',
+            icon: '⚡',
+            confirmText: 'Next'
+        });
+        if (!name || !name.trim()) return;
+
+        const isGlobal = await waConfirm({
+            title: 'Preset Visibility',
+            desc: `Where do you want to save "${name.trim()}"?\n\n• 🌐 GLOBAL: Visible to whole team on all PCs & syncable to GitHub\n• 🔒 PRIVATE: Saved only on this computer`,
+            icon: '🌐',
+            confirmText: '🌐 Make Global (Team)',
+            cancelText: '🔒 Keep Private'
+        });
+        const scope = isGlobal ? 'global' : 'personal';
+
+        try {
+            const res = await fetch(`${API_BASE}/saved-lists`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim(), jids: selectedJids, scope })
+            });
+            const data = await res.json();
+            if (data.success) { 
+                savedLists = Array.isArray(data.lists) ? data.lists : []; 
+                globalLists = Array.isArray(data.globalLists) ? data.globalLists : [];
+                renderSavedLists(); 
+                renderQuickSelectLists();
+                showToast(`List "${name.trim()}" saved as ${scope === 'global' ? '🌐 Global' : '🔒 Private'}!`, 'success'); 
+            } else {
+                showToast(data.message || 'Failed to save preset list.', 'error');
+            }
+        } catch(err) { 
+            showToast('Failed to save: ' + err.message, 'error'); 
         }
     }
 
     const btnAddBroadcastList = document.getElementById('btn-add-broadcast-list');
     if (btnAddBroadcastList) {
         btnAddBroadcastList.addEventListener('click', () => {
-            bulkSelectedGroups.clear();
-            activeBroadcastListId = null;
-            document.querySelectorAll('.bl-item').forEach(el => el.classList.remove('active'));
-            switchToTab('bulk');
-            renderBulkGroupList('');
-            renderQuickSelectLists();
-            fetchTemplates();
+            if (bulkSelectedGroups.size > 0) {
+                saveCurrentSelectionAsPreset();
+            } else {
+                switchToTab('bulk');
+                showToast('Select recipients from the list below, then click "+ New List" or "💾 Save"', 'info');
+            }
         });
     }
 
     const btnSaveCurrentList = document.getElementById('btn-save-current-list');
     if (btnSaveCurrentList) {
-        btnSaveCurrentList.addEventListener('click', async (e) => {
+        btnSaveCurrentList.addEventListener('click', (e) => {
             e.preventDefault();
-            const selectedJids = Array.from(bulkSelectedGroups);
-            if (selectedJids.length === 0) { 
-                showToast('Please select at least 1 contact or group to save.', 'warning'); 
-                return; 
-            }
-            const name = await waPrompt({
-                title: 'Save Selection as Preset',
-                desc: `Save ${selectedJids.length} selected recipients as a quick-access preset list.`,
-                label: 'Preset List Name:',
-                placeholder: 'e.g. VIP Clients, Pabna Team, Monthly Bills',
-                icon: '💾',
-                confirmText: 'Save Preset'
-            });
-            let scope = 'personal';
-            if (window.currentAuthUser && window.currentAuthUser.role === 'admin') {
-                const isGlobal = await waConfirm({
-                    title: 'Share Globally with Team?',
-                    desc: `Do you want to save "${name.trim()}" as a GLOBAL Quick Select list so everyone on your team can see it?`,
-                    icon: '🌐',
-                    confirmText: 'Yes, Make Global',
-                    cancelText: 'Personal Only'
-                });
-                if (isGlobal) scope = 'global';
-            }
-            try {
-                const res = await fetch(`${API_BASE}/saved-lists`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-wa-admin': (window.currentAuthUser?.role === 'admin') ? '1' : '0' },
-                    body: JSON.stringify({ name: name.trim(), jids: selectedJids, scope })
-                });
-                const data = await res.json();
-                if (data.success) { 
-                    savedLists = Array.isArray(data.lists) ? data.lists : []; 
-                    globalLists = Array.isArray(data.globalLists) ? data.globalLists : [];
-                    renderSavedLists(); 
-                    renderQuickSelectLists();
-                    showToast(`Preset list "${name.trim()}" saved successfully!`, 'success'); 
-                } else {
-                    showToast(data.message || 'Failed to save preset list.', 'error');
-                }
-            } catch(err) { 
-                showToast('Failed to save: ' + err.message, 'error'); 
-            }
+            saveCurrentSelectionAsPreset();
+        });
+    }
+
+    const btnQuickSelectNew = document.getElementById('btn-quick-select-new');
+    if (btnQuickSelectNew) {
+        btnQuickSelectNew.addEventListener('click', (e) => {
+            e.preventDefault();
+            saveCurrentSelectionAsPreset();
         });
     }
 
@@ -2769,6 +2777,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadGitHubSyncSettings() {
         try {
+            const summaryTmpls = document.getElementById('gh-summary-tmpls');
+            const summaryLists = document.getElementById('gh-summary-lists');
+            if (summaryTmpls) summaryTmpls.textContent = `${globalTemplates.length} Templates`;
+            if (summaryLists) summaryLists.textContent = `${globalLists.length} Lists`;
+
             const res = await fetch(`${API_BASE}/github-sync/config`);
             const data = await res.json();
             if (data.success && data.config) {
@@ -2778,11 +2791,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tokenEl = document.getElementById('gh-input-token');
                 const autoSyncEl = document.getElementById('gh-input-autosync');
                 const statusBadge = document.getElementById('github-sync-status-badge');
+                const tokenIndicator = document.getElementById('gh-token-status-indicator');
 
                 if (repoEl) repoEl.value = cfg.repo || '';
                 if (branchEl) branchEl.value = cfg.branch || 'main';
                 if (tokenEl && cfg.token) tokenEl.placeholder = cfg.token;
                 if (autoSyncEl) autoSyncEl.checked = !!cfg.autoSync;
+
+                if (tokenIndicator) {
+                    if (cfg.hasToken) {
+                        tokenIndicator.textContent = '🟢 Token Active';
+                        tokenIndicator.style.color = '#059669';
+                    } else {
+                        tokenIndicator.textContent = '⚪ Token Required to Push';
+                        tokenIndicator.style.color = '#ea580c';
+                    }
+                }
 
                 if (statusBadge) {
                     if (cfg.repo) {
@@ -2806,7 +2830,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!box || !iconEl || !textEl) return;
         box.style.display = 'flex';
         iconEl.textContent = icon;
-        textEl.textContent = text;
+        textEl.innerHTML = text;
         if (type === 'success') {
             box.style.background = 'rgba(16, 185, 129, 0.12)';
             box.style.border = '1px solid rgba(16, 185, 129, 0.3)';
@@ -2838,7 +2862,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             if (data.success) {
                 showToast('GitHub configuration saved!', 'success');
-                showGitHubResult('✅', 'GitHub configuration and token saved successfully!', 'success');
+                showGitHubResult('✅', 'GitHub configuration and token saved successfully! You can now click <b>"⬆️ Upload / Push"</b> anytime.', 'success');
                 await loadGitHubSyncSettings();
             } else {
                 showToast(data.message || 'Failed to save config', 'error');
@@ -2855,7 +2879,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btn) btn.disabled = true;
         if (!silent) {
             showToast('Syncing Global templates & lists from GitHub...', 'info');
-            showGitHubResult('⏳', 'Downloading latest Global data from GitHub...', 'info');
+            showGitHubResult('⏳', 'Downloading latest Global templates and lists from GitHub...', 'info');
         }
 
         try {
@@ -2871,9 +2895,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderQuickSelectLists();
                     renderSavedLists();
                 }
+                await loadGitHubSyncSettings();
                 if (!silent) {
                     showToast(data.message || 'Synced successfully from GitHub!', 'success');
-                    showGitHubResult('✅', data.message || 'Synced successfully from GitHub!', 'success');
+                    showGitHubResult('✅', `${data.message || 'Synced successfully from GitHub!'}`, 'success');
                 }
             } else {
                 if (!silent) {
@@ -2895,17 +2920,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('btn-github-push');
         if (btn) btn.disabled = true;
         showToast('Uploading Global data to GitHub...', 'info');
-        showGitHubResult('⏳', 'Uploading Global templates & lists to GitHub...', 'info');
+        showGitHubResult('⏳', `Uploading ${globalTemplates.length} Templates & ${globalLists.length} Quick Select Lists to GitHub...`, 'info');
 
         try {
             const res = await fetch(`${API_BASE}/github-sync/push`, { method: 'POST' });
             const data = await res.json();
             if (data.success) {
+                const repo = document.getElementById('gh-input-repo')?.value.trim() || 'rayhanvision-a11y/BulkWhatappMessage';
                 showToast(data.message || 'Uploaded to GitHub successfully!', 'success');
-                showGitHubResult('✅', data.message || 'Uploaded to GitHub successfully!', 'success');
+                showGitHubResult('✅', `<b>পুশ সফল হয়েছে!</b> ${data.message || ''} <a href="https://github.com/${repo}" target="_blank" style="color:#00a884;text-decoration:underline;margin-left:6px;font-weight:700;">View Live on GitHub ↗</a>`, 'success');
+                await loadGitHubSyncSettings();
             } else {
                 showToast(data.message || 'GitHub upload failed.', 'error');
-                showGitHubResult('❌', data.message || 'GitHub upload failed.', 'error');
+                showGitHubResult('❌', data.message || 'GitHub upload failed. Please verify your Personal Access Token.', 'error');
             }
         } catch(err) {
             showToast('Upload error: ' + err.message, 'error');

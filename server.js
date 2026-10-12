@@ -182,19 +182,14 @@ async function githubFetchFile(repo, branch, filePath, token) {
         'User-Agent': 'WhatsAppWeb-System-App',
         'Accept': 'application/vnd.github.v3+json'
     };
-    if (token) headers['Authorization'] = `token ${token}`;
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const url = `https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`;
     const res = await fetch(url, { headers });
+    if (res.status === 404) {
+        return { content: '[]', sha: null, notFound: true };
+    }
     if (!res.ok) {
-        const rawUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${filePath}`;
-        const rawRes = await fetch(rawUrl, {
-            headers: token ? { 'Authorization': `token ${token}`, 'User-Agent': 'WhatsAppWeb-System-App' } : { 'User-Agent': 'WhatsAppWeb-System-App' }
-        });
-        if (rawRes.ok) {
-            const text = await rawRes.text();
-            return { content: text, sha: null };
-        }
         throw new Error(`Failed to fetch ${filePath}: HTTP ${res.status}`);
     }
     const data = await res.json();
@@ -1311,7 +1306,6 @@ app.get('/api/whatsapp/saved-lists', (req, res) => {
 app.post('/api/whatsapp/saved-lists', (req, res) => {
     const s = getSessionFromReq(req);
     const { name, jids, scope } = req.body;
-    const isAdmin = req.headers['x-wa-admin'] === '1';
     if (!name || !Array.isArray(jids) || jids.length === 0) return res.status(400).json({ success: false, message: 'Name and jids required' });
     
     const isGlobal = (scope === 'global');
@@ -1324,7 +1318,7 @@ app.post('/api/whatsapp/saved-lists', (req, res) => {
         isGlobal: isGlobal 
     };
 
-    if (isGlobal && isAdmin) {
+    if (isGlobal) {
         globalListsStore.unshift(newList);
         saveGlobalLists();
     } else {
@@ -1334,32 +1328,77 @@ app.post('/api/whatsapp/saved-lists', (req, res) => {
     res.json({ success: true, list: newList, lists: s.savedListsStore, globalLists: globalListsStore });
 });
 
+app.post('/api/whatsapp/saved-lists/:id/toggle-public', (req, res) => {
+    const s = getSessionFromReq(req);
+    const id = req.params.id;
+    
+    // Check if in globalListsStore -> convert to private
+    const gIndex = globalListsStore.findIndex(l => l.id === id);
+    if (gIndex !== -1) {
+        const item = globalListsStore.splice(gIndex, 1)[0];
+        item.isGlobal = false;
+        item.isPublic = false;
+        s.savedListsStore.unshift(item);
+        saveGlobalLists();
+        saveStoreToDisk(s, true);
+        return res.json({ success: true, message: `"${item.name}" is now Private (This PC)`, lists: s.savedListsStore, globalLists: globalListsStore });
+    }
+    
+    // Check if in personal savedListsStore -> convert to global
+    const pIndex = s.savedListsStore.findIndex(l => l.id === id);
+    if (pIndex !== -1) {
+        const item = s.savedListsStore.splice(pIndex, 1)[0];
+        item.isGlobal = true;
+        item.isPublic = true;
+        globalListsStore.unshift(item);
+        saveGlobalLists();
+        saveStoreToDisk(s, true);
+        return res.json({ success: true, message: `"${item.name}" is now Global (Team & GitHub Cloud)`, lists: s.savedListsStore, globalLists: globalListsStore });
+    }
+
+    res.status(404).json({ success: false, message: 'List not found' });
+});
+
 app.post('/api/whatsapp/saved-lists/:id/rename', (req, res) => {
     const s = getSessionFromReq(req);
-    const isAdmin = req.headers['x-wa-admin'] === '1';
-    let list = isAdmin ? globalListsStore.find(l => l.id === req.params.id) : null;
-    const isGlobal = !!list;
-    if (!list) list = s.savedListsStore.find(l => l.id === req.params.id);
-    if (!list) return res.status(404).json({ success: false, message: 'Not found' });
-    if (!req.body.name?.trim()) return res.status(400).json({ success: false, message: 'Name required' });
+    const id = req.params.id;
+    const newName = (req.body.name || '').trim();
+    if (!newName) return res.status(400).json({ success: false, message: 'Name required' });
     
-    list.name = req.body.name.trim();
-    if (isGlobal) saveGlobalLists(); else saveStoreToDisk(s);
-    res.json({ success: true, lists: s.savedListsStore, globalLists: globalListsStore });
+    let list = globalListsStore.find(l => l.id === id);
+    if (list) {
+        list.name = newName;
+        saveGlobalLists();
+        return res.json({ success: true, lists: s.savedListsStore, globalLists: globalListsStore });
+    }
+    
+    list = s.savedListsStore.find(l => l.id === id);
+    if (list) {
+        list.name = newName;
+        saveStoreToDisk(s, true);
+        return res.json({ success: true, lists: s.savedListsStore, globalLists: globalListsStore });
+    }
+    
+    res.status(404).json({ success: false, message: 'List not found' });
 });
 
 app.delete('/api/whatsapp/saved-lists', (req, res) => {
     const s = getSessionFromReq(req);
-    const isAdmin = req.headers['x-wa-admin'] === '1';
     const id = req.query.id;
     const scope = req.query.scope;
     
-    if (scope === 'global' && isAdmin) {
+    if (scope === 'global') {
         globalListsStore = globalListsStore.filter(l => l.id !== id);
         saveGlobalLists();
     } else {
-        s.savedListsStore = s.savedListsStore.filter(l => l.id !== id);
-        saveStoreToDisk(s, true);
+        const inGlobal = globalListsStore.some(l => l.id === id);
+        if (inGlobal) {
+            globalListsStore = globalListsStore.filter(l => l.id !== id);
+            saveGlobalLists();
+        } else {
+            s.savedListsStore = s.savedListsStore.filter(l => l.id !== id);
+            saveStoreToDisk(s, true);
+        }
     }
     res.json({ success: true, lists: s.savedListsStore, globalLists: globalListsStore });
 });
@@ -1381,10 +1420,14 @@ app.post('/api/whatsapp/github-sync/config', (req, res) => {
     const { repo, branch, token, autoSync } = req.body || {};
     const current = getGitHubConfig();
     const cleanRepo = repo ? repo.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '') : current.repo;
+    let cleanToken = (token && token.trim() && !token.includes('...')) ? token.trim() : current.token;
+    if (cleanToken && cleanToken.includes('ghp_')) {
+        cleanToken = cleanToken.substring(cleanToken.indexOf('ghp_'));
+    }
     const newCfg = {
         repo: cleanRepo,
         branch: (branch && branch.trim()) || current.branch || 'main',
-        token: (token && token.trim() && !token.includes('...')) ? token.trim() : current.token,
+        token: cleanToken,
         autoSync: typeof autoSync === 'boolean' ? autoSync : current.autoSync
     };
     saveGitHubConfig(newCfg);
@@ -1478,10 +1521,9 @@ app.get('/api/whatsapp/templates', (req, res) => {
 app.post('/api/whatsapp/templates', (req, res) => {
     const s = getSessionFromReq(req);
     const { name, message, scope } = req.body;
-    const isAdmin = req.headers['x-wa-admin'] === '1';
     if (!name || !message) return res.status(400).json({ success: false, message: 'Name and message required' });
     const tmpl = { id: 'tmpl-' + Date.now(), name: name.trim(), message: message.trim(), createdAt: new Date().toLocaleDateString() };
-    if (scope === 'global' && isAdmin) {
+    if (scope === 'global') {
         globalTemplatesStore.unshift(tmpl);
         saveGlobalTemplates();
     } else {
@@ -1493,8 +1535,7 @@ app.post('/api/whatsapp/templates', (req, res) => {
 
 app.post('/api/whatsapp/templates/:id/rename', (req, res) => {
     const s = getSessionFromReq(req);
-    const isAdmin = req.headers['x-wa-admin'] === '1';
-    let tmpl = isAdmin ? globalTemplatesStore.find(t => t.id === req.params.id) : null;
+    let tmpl = globalTemplatesStore.find(t => t.id === req.params.id);
     const isGlobal = !!tmpl;
     if (!tmpl) tmpl = s.savedTemplatesStore.find(t => t.id === req.params.id);
     if (!tmpl) return res.status(404).json({ success: false });
@@ -1506,15 +1547,20 @@ app.post('/api/whatsapp/templates/:id/rename', (req, res) => {
 
 app.delete('/api/whatsapp/templates', (req, res) => {
     const s = getSessionFromReq(req);
-    const isAdmin = req.headers['x-wa-admin'] === '1';
     const id = req.query.id;
     const scope = req.query.scope;
-    if (scope === 'global' && isAdmin) {
+    if (scope === 'global') {
         globalTemplatesStore = globalTemplatesStore.filter(t => t.id !== id);
         saveGlobalTemplates();
     } else {
-        s.savedTemplatesStore = s.savedTemplatesStore.filter(t => t.id !== id);
-        saveStoreToDisk(s, true);
+        const inGlobal = globalTemplatesStore.some(t => t.id === id);
+        if (inGlobal) {
+            globalTemplatesStore = globalTemplatesStore.filter(t => t.id !== id);
+            saveGlobalTemplates();
+        } else {
+            s.savedTemplatesStore = s.savedTemplatesStore.filter(t => t.id !== id);
+            saveStoreToDisk(s, true);
+        }
     }
     res.json({ success: true, globalTemplates: globalTemplatesStore, personalTemplates: s.savedTemplatesStore });
 });
